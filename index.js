@@ -135,13 +135,11 @@ app.post("/api/login", async (req, res) => {
       .send({ message: "Incorrect username/password provided. Please retry" });
 
   const token = generateAccessToken(64);
-  return res
-    .status(200)
-    .send({
-      message: "Login successful",
-      access_token: token,
-      user_id: user[0][0].user_id,
-    });
+  return res.status(200).send({
+    message: "Login successful",
+    access_token: token,
+    user_id: user[0][0].user_id,
+  });
 });
 
 app.post("/api/trains/create", async (req, res) => {
@@ -171,7 +169,7 @@ app.post("/api/trains/create", async (req, res) => {
       "','" +
       trainID +
       "');";
-      await pool.query(createTrainQuery);
+    await pool.query(createTrainQuery);
     console.log("Train added successfully");
     res
       .status(200)
@@ -181,25 +179,90 @@ app.post("/api/trains/create", async (req, res) => {
   }
 });
 
-
 //GET TRAIN REQUEST
-app.get('/api/trains/availability', async (req, res) => {
-    try {
-      const { source, destination } = req.query;
-      // SQL query to retrieve train availability information
-      const sql = "SELECT * FROM trains WHERE source = '"+source+"' AND destination = '"+destination+"';";
-  
-      // Execute the SQL query
-      const [rows] = await pool.query(sql);
-  
-      // Send the retrieved data as a JSON response
-      res.json({ data: rows });
-    } catch (error) {
-      console.error('Error:', error.message);
-      res.status(500).json({ error: 'Internal Server Error' });
-    }
-  });
+app.get("/api/trains/availability", async (req, res) => {
+  try {
+    const { source, destination } = req.query;
+    // SQL query to retrieve train availability information
+    const sql =
+      "SELECT * FROM trains WHERE source = '" +
+      source +
+      "' AND destination = '" +
+      destination +
+      "';";
 
+    // Execute the SQL query
+    const [rows] = await pool.query(sql);
+
+    // Send the retrieved data as a JSON response
+    res.json({ data: rows });
+  } catch (error) {
+    console.error("Error:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+//BOOK A SEAT
+
+app.post("/api/trains/:train_id/book", async (req, res) => {
+  try {
+    const { train_id } = req.params;
+    const { user_id, no_of_seats } = req.body;
+
+    // Check if the train exists and has available seats
+    const [trainRows] = await pool.query(
+      "SELECT * FROM trains WHERE trainIDs ='" +
+        train_id +
+        "'AND seat_capacity >=" +
+        no_of_seats +
+        ";"
+    );
+
+    if (trainRows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "Train not found or not enough seats available." });
+    }
+
+    // Assuming you have a bookings table, insert the booking record
+    const q =
+      "INSERT INTO bookings (train_id,train_name,user_id, no_of_seats,seat_number,arrival_time_at_source,arrival_time_at_destination) VALUES ('" +
+      train_id +
+      "','" +
+      trainRows[0].train_name +
+      "','" +
+      user_id +
+      "','" +
+      no_of_seats +
+      "','" +
+      "1,2,3" +
+      "','" +
+      trainRows[0].arrival_time_at_source +
+      "','" +
+      trainRows[0].arrival_time_at_destination +
+      "')";
+    console.log(q);
+    await pool.query(q); // Update the seat capacity of the train
+    await pool.query(
+      "UPDATE trains SET seat_capacity = seat_capacity - ? WHERE trainIDs = ?",
+      [no_of_seats, train_id]
+    );
+    res.json({ message: "Seat booked successfully!" });
+  } catch (error) {
+    console.error("Error:", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.get("/api/bookings/:booking_id", async (req, res) => {
+    try {
+        const bid = req.params.booking_id;
+        const result = await pool.query("SELECT * FROM bookings WHERE bookingid= ?",[bid])
+        res.status(200).send({message:result[0]});
+    } catch (error) {
+        res.status(500).send({message:"Internal Server Error"});
+    }
+});
 // Start the server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
