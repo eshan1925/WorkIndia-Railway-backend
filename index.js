@@ -171,7 +171,7 @@ app.post("/api/trains/create", async (req, res) => {
       "','" +
       trainID +
       "');";
-
+      await pool.query(createTrainQuery);
     console.log("Train added successfully");
     res
       .status(200)
@@ -186,16 +186,11 @@ app.post("/api/trains/create", async (req, res) => {
 app.get('/api/trains/availability', async (req, res) => {
     try {
       const { source, destination } = req.query;
-  
       // SQL query to retrieve train availability information
-      const sql = `
-        SELECT *
-        FROM train_availability
-        WHERE source = ? AND destination = ?
-      `;
+      const sql = "SELECT * FROM trains WHERE source = '"+source+"' AND destination = '"+destination+"';";
   
       // Execute the SQL query
-      const [rows] = await connection.execute(sql, [source, destination]);
+      const [rows] = await pool.query(sql);
   
       // Send the retrieved data as a JSON response
       res.json({ data: rows });
